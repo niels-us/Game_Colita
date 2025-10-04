@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>COLA LEGENDS</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; }
+    body {
+      font-family: Arial, Helvetica, sans-serif;
+      overflow: hidden;
+      background: linear-gradient(to top, #87CEEB 70%, #91a5d9 100%);
+    }
+
+    h1 {
+      position: absolute;
+      top: 10px;
+      left: 0;
+      width: 100%;
+      margin: 0;
+      text-align: center;
+      font-size: 72px;
+      color: blue;
+      text-shadow:
+        -2px -2px 0 yellow,
+         2px -2px 0 yellow,
+        -2px  2px 0 yellow,
+         2px  2px 0 yellow;
+      z-index: 100;
+      pointer-events: none;
+    }
+
+    /* Mundo (escenario grande) */
+    .mundo {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 3000px; /* ancho total del mundo */
+      height: 100vh;
+      transform: translateX(0);
+      z-index: 1;
+    }
+
+    /* Nubes */
+    .nube {
+      position: absolute;
+      background: white;
+      border-radius: 50%;
+      opacity: 0.95;
+      z-index: 20;
+    }
+    .nube::before, .nube::after { content: ""; position: absolute; background: white; border-radius: 50%; }
+    .nube.pequeña { width: 60px; height: 40px; }
+    .nube.pequeña::before { width: 30px; height: 30px; left: -15px; top: 5px; }
+    .nube.pequeña::after  { width: 30px; height: 30px; right: -15px; top: 5px; }
+
+    /* Suelo */
+    .suelo {
+      position: absolute;
+      left: 0;
+      bottom: 0;
+      width: 100%;
+      height: 120px;
+      background: linear-gradient(to top, #228B22, #32CD32);
+      border-top: 5px solid #1a6b1a;
+      z-index: 10;
+    }
+
+    /* Personaje: fuera del mundo, posición respecto a la ventana */
+    .personaje {
+      position: fixed; /* fijado a la ventana para controlar left/bottom directamente */
+      width: 100px;
+      height: 100px;
+      z-index: 200;
+      pointer-events: none;
+      transform-origin: center;
+    }
+    .personaje img { width: 100%; height: 100%; object-fit: contain; display:block; }
+  </style>
+</head>
+<body>
+  <h1>COLA LEGENDS</h1>
+
+  <div class="mundo" id="mundo">
+    <div class="nube pequeña" style="top: 80px; left: 100px;"></div>
+    <div class="nube pequeña" style="top: 150px; left: 400px;"></div>
+    <div class="nube pequeña" style="top: 60px; left: 700px;"></div>
+    <div class="nube pequeña" style="top: 120px; left: 1200px;"></div>
+    <div class="nube pequeña" style="top: 100px; left: 1600px;"></div>
+
+    <div class="suelo"></div>
+  </div>
+
+  <div class="personaje" id="personaje">
+    <img id="sprite" src="img/cola1.png" alt="Personaje">
+  </div>
+
+  <script>
+    // ELEMENTOS
+    const mundo = document.getElementById('mundo');
+    const personajeEl = document.getElementById('personaje');
+    const sprite = document.getElementById('sprite');
+
+    // SPRITES (ajusta rutas si es necesario)
+    const imgParado = "img/cola.png";
+    const imgCam1   = "img/cola1.png";
+    const imgCam2   = "img/cola2.png";
+    const imgSaltar = "img/cola3.png";
+
+    // CONFIG MUNDO
+    let anchoMundo = 3000;               // ancho total del mundo en px
+    let anchoPantalla = window.innerWidth;
+    let desplazamientoMundo = 0;         // cuánto se ha desplazado el mundo (scroll)
+
+    // PERSONAJE (posicion dentro del mundo)
+    let xWorld = 200;          // posición X del personaje en coordenadas del mundo (px)
+    let y = 100;               // bottom en px (altura sobre el suelo)
+    let velocidadY = 0;
+    let enSuelo = true;
+
+    const gravedad = 1;
+    const fuerzaSalto = 18;
+    const velocidadX = 6;
+    const alturaSuelo = 100;   // bottom mínimo (suelo)
+
+    // animación
+    let animTick = 0;
+    let facing = 1; // 1 derecha, -1 izquierda
+
+    // teclas
+    const teclas = { ArrowLeft: false, ArrowRight: false, ArrowUp: false };
+    window.addEventListener('keydown', e => { if (e.code in teclas) teclas[e.code] = true; });
+    window.addEventListener('keyup',   e => { if (e.code in teclas) teclas[e.code] = false; });
+
+    window.addEventListener('resize', () => {
+      anchoPantalla = window.innerWidth;
+      // opcional: recalcula cosas si cambias anchoMundo
+    });
+
+    function actualizar() {
+      // movimiento horizontal en coordenadas del mundo
+      if (teclas.ArrowLeft && !teclas.ArrowRight) { xWorld -= velocidadX; facing = -1; }
+      if (teclas.ArrowRight && !teclas.ArrowLeft) { xWorld += velocidadX; facing = 1; }
+
+      // limitar X dentro del mundo
+      const anchoPersonaje = 100;
+      xWorld = Math.max(0, Math.min(xWorld, anchoMundo - anchoPersonaje));
+
+      // salto
+      if (teclas.ArrowUp && enSuelo) {
+        velocidadY = -fuerzaSalto;
+        enSuelo = false;
+      }
+
+      // gravedad
+      velocidadY += gravedad;
+      y -= velocidadY;
+      if (y <= alturaSuelo) {
+        y = alturaSuelo;
+        velocidadY = 0;
+        enSuelo = true;
+      }
+
+      // animación sprite
+      if (!enSuelo) {
+        sprite.src = imgSaltar;
+      } else if (teclas.ArrowLeft || teclas.ArrowRight) {
+        animTick++;
+        sprite.src = (animTick % 20 < 10) ? imgCam1 : imgCam2;
+      } else {
+        sprite.src = imgParado;
+      }
+
+      // --- Lógica de scroll del mundo ---
+      // margenes donde empieza a desplazarse el mundo (porcentaje de pantalla)
+      const leftMargin = anchoPantalla * 0.25;
+      const rightMargin = anchoPantalla * 0.75;
+
+      // posición del personaje en pantalla (relativa) antes de ajustar scroll
+      let screenX = xWorld - desplazamientoMundo;
+
+      // si pasa el margen derecho y el mundo puede desplazarse, movemos el mundo
+      if (screenX > rightMargin && desplazamientoMundo < (anchoMundo - anchoPantalla)) {
+        desplazamientoMundo = xWorld - rightMargin;
+      }
+      // si pasa el margen izquierdo y el mundo puede desplazarse a la izquierda
+      if (screenX < leftMargin && desplazamientoMundo > 0) {
+        desplazamientoMundo = xWorld - leftMargin;
+      }
+
+      // clamp final del desplazamiento
+      desplazamientoMundo = Math.max(0, Math.min(desplazamientoMundo, Math.max(0, anchoMundo - anchoPantalla)));
+
+      // recalcular screenX con desplazamiento final
+      screenX = xWorld - desplazamientoMundo;
+
+      // Aplicar transform al mundo (mueve nubes/suelo)
+      mundo.style.transform = `translateX(${-Math.round(desplazamientoMundo)}px)`;
+
+      // Posicionar personaje en pantalla (left = punto central del sprite)
+      personajeEl.style.left = `${Math.round(screenX)}px`;
+      personajeEl.style.bottom = `${Math.round(y)}px`;
+
+      // Centro el sprite en el punto (uso translateX(-50%)) y lo volteo si hace falta
+      personajeEl.style.transform = `translateX(-50%) scaleX(${facing})`;
+
+      requestAnimationFrame(actualizar);
+    }
+
+    // iniciar
+    actualizar();
+  </script>
+</body>
+</html>
