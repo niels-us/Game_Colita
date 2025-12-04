@@ -2,10 +2,11 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
   <title>COLA LEGENDS</title>
   <style>
     * { box-sizing: border-box; }
-    html, body { height: 100%; margin: 0; }
+    html, body { height: 100%; margin: 0; touch-action: none; /* Previene el zoom/scroll */ }
     body {
       font-family: Arial, Helvetica, sans-serif;
       overflow: hidden;
@@ -19,7 +20,8 @@
       width: 100%;
       margin: 0;
       text-align: center;
-      font-size: 72px;
+      /* AJUSTE: Reducción de fuente para móviles */
+      font-size: 40px; 
       color: blue;
       text-shadow:
         -2px -2px 0 yellow,
@@ -52,7 +54,7 @@
     .nube::before, .nube::after { content: ""; position: absolute; background: white; border-radius: 50%; }
     .nube.pequeña { width: 60px; height: 40px; }
     .nube.pequeña::before { width: 30px; height: 30px; left: -15px; top: 5px; }
-    .nube.pequeña::after  { width: 30px; height: 30px; right: -15px; top: 5px; }
+    .nube.pequeña::after { width: 30px; height: 30px; right: -15px; top: 5px; }
 
     /* Suelo */
     .suelo {
@@ -66,9 +68,9 @@
       z-index: 10;
     }
 
-    /* Personaje: fuera del mundo, posición respecto a la ventana */
+    /* Personaje */
     .personaje {
-      position: fixed; /* fijado a la ventana para controlar left/bottom directamente */
+      position: fixed;
       width: 100px;
       height: 100px;
       z-index: 200;
@@ -76,6 +78,61 @@
       transform-origin: center;
     }
     .personaje img { width: 100%; height: 100%; object-fit: contain; display:block; }
+
+    /* --- CONTROLES MÓVILES --- */
+    #controles {
+      position: fixed;
+      bottom: 10px;
+      left: 0;
+      width: 100%;
+      padding: 10px;
+      z-index: 500; /* Asegura que estén por encima de todo */
+      display: flex;
+      justify-content: space-between;
+      pointer-events: none; /* Permite clicks en los botones, pero no en el contenedor */
+    }
+
+    .boton {
+      width: 60px;
+      height: 60px;
+      background: rgba(0, 0, 0, 0.6);
+      border: 3px solid white;
+      border-radius: 50%;
+      color: white;
+      font-size: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      user-select: none;
+      pointer-events: all; /* Hace que el botón sea clickeable/táctil */
+      touch-action: manipulation; /* Optimiza para interacción táctil */
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+    }
+    
+    .boton:active {
+        background: rgba(255, 255, 255, 0.8);
+        color: black;
+    }
+
+    #dpad {
+      display: flex;
+      gap: 10px;
+      margin-left: 20px;
+    }
+
+    #salto {
+      margin-right: 20px;
+    }
+    
+    /* Pequeño ajuste para pantallas más pequeñas */
+    @media (max-width: 600px) {
+        .boton {
+            width: 50px;
+            height: 50px;
+            font-size: 20px;
+        }
+    }
   </style>
 </head>
 <body>
@@ -95,11 +152,25 @@
     <img id="sprite" src="img/cola1.png" alt="Personaje">
   </div>
 
+  <div id="controles">
+    <div id="dpad">
+      <div class="boton" id="btnLeft">◀</div>
+      <div class="boton" id="btnRight">▶</div>
+    </div>
+    <div id="salto">
+      <div class="boton" id="btnUp">▲</div>
+    </div>
+  </div>
   <script>
     // ELEMENTOS
     const mundo = document.getElementById('mundo');
     const personajeEl = document.getElementById('personaje');
     const sprite = document.getElementById('sprite');
+    
+    // ELEMENTOS DE CONTROL MÓVIL
+    const btnLeft = document.getElementById('btnLeft');
+    const btnRight = document.getElementById('btnRight');
+    const btnUp = document.getElementById('btnUp');
 
     // SPRITES (ajusta rutas si es necesario)
     const imgParado = "img/cola.png";
@@ -108,42 +179,72 @@
     const imgSaltar = "img/cola3.png";
 
     // CONFIG MUNDO
-    let anchoMundo = 3000;               // ancho total del mundo en px
+    let anchoMundo = 3000;
     let anchoPantalla = window.innerWidth;
-    let desplazamientoMundo = 0;         // cuánto se ha desplazado el mundo (scroll)
+    let desplazamientoMundo = 0;
 
-    // PERSONAJE (posicion dentro del mundo)
-    let xWorld = 200;          // posición X del personaje en coordenadas del mundo (px)
-    let y = 100;               // bottom en px (altura sobre el suelo)
+    // PERSONAJE
+    let xWorld = 200;
+    let y = 100;
     let velocidadY = 0;
     let enSuelo = true;
 
     const gravedad = 1;
     const fuerzaSalto = 18;
     const velocidadX = 6;
-    const alturaSuelo = 100;   // bottom mínimo (suelo)
+    const alturaSuelo = 100;
+    const anchoPersonaje = 100; // Lo mantenemos aquí para la lógica de límites
 
     // animación
     let animTick = 0;
     let facing = 1; // 1 derecha, -1 izquierda
 
-    // teclas
+    // teclas (objeto que controla el estado de los inputs, ya sea teclado o táctil)
     const teclas = { ArrowLeft: false, ArrowRight: false, ArrowUp: false };
+    
+    // --- LÓGICA DE INPUT UNIFICADA ---
+
+    // 1. Teclado
     window.addEventListener('keydown', e => { if (e.code in teclas) teclas[e.code] = true; });
     window.addEventListener('keyup',   e => { if (e.code in teclas) teclas[e.code] = false; });
+    
+    // 2. Táctil / Mouse (Mantiene el botón presionado)
+    
+    function setKey(code, value) {
+        if (code in teclas) {
+            teclas[code] = value;
+        }
+    }
+    
+    // Eventos para el botón Izquierda
+    btnLeft.addEventListener('touchstart', (e) => { e.preventDefault(); setKey('ArrowLeft', true); });
+    btnLeft.addEventListener('touchend', (e) => { e.preventDefault(); setKey('ArrowLeft', false); });
+    btnLeft.addEventListener('mousedown', () => setKey('ArrowLeft', true));
+    btnLeft.addEventListener('mouseup', () => setKey('ArrowLeft', false));
+
+    // Eventos para el botón Derecha
+    btnRight.addEventListener('touchstart', (e) => { e.preventDefault(); setKey('ArrowRight', true); });
+    btnRight.addEventListener('touchend', (e) => { e.preventDefault(); setKey('ArrowRight', false); });
+    btnRight.addEventListener('mousedown', () => setKey('ArrowRight', true));
+    btnRight.addEventListener('mouseup', () => setKey('ArrowRight', false));
+
+    // Eventos para el botón Saltar
+    btnUp.addEventListener('touchstart', (e) => { e.preventDefault(); setKey('ArrowUp', true); });
+    btnUp.addEventListener('touchend', (e) => { e.preventDefault(); setKey('ArrowUp', false); });
+    btnUp.addEventListener('mousedown', () => setKey('ArrowUp', true));
+    btnUp.addEventListener('mouseup', () => setKey('ArrowUp', false));
+    // ---------------------------------
 
     window.addEventListener('resize', () => {
       anchoPantalla = window.innerWidth;
-      // opcional: recalcula cosas si cambias anchoMundo
     });
 
     function actualizar() {
-      // movimiento horizontal en coordenadas del mundo
+      // movimiento horizontal en coordenadas del mundo (usa las mismas 'teclas' para teclado/táctil)
       if (teclas.ArrowLeft && !teclas.ArrowRight) { xWorld -= velocidadX; facing = -1; }
       if (teclas.ArrowRight && !teclas.ArrowLeft) { xWorld += velocidadX; facing = 1; }
 
       // limitar X dentro del mundo
-      const anchoPersonaje = 100;
       xWorld = Math.max(0, Math.min(xWorld, anchoMundo - anchoPersonaje));
 
       // salto
