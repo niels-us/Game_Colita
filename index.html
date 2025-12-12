@@ -1,12 +1,23 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
   <title>COLA LEGENDS</title>
   <style>
-    * { box-sizing: border-box; }
-    html, body { height: 100%; margin: 0; touch-action: none; /* Previene el zoom/scroll */ }
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      height: 100%;
+      margin: 0;
+      touch-action: none;
+      /* Previene el zoom/scroll */
+    }
+
     body {
       font-family: Arial, Helvetica, sans-serif;
       overflow: hidden;
@@ -20,16 +31,18 @@
       width: 100%;
       margin: 0;
       text-align: center;
-      /* AJUSTE: Reducción de fuente para móviles */
-      font-size: 40px; 
+      /* AJUSTE: Fuente responsiva */
+      font-size: min(8vw, 40px);
       color: blue;
       text-shadow:
         -2px -2px 0 yellow,
-         2px -2px 0 yellow,
-        -2px  2px 0 yellow,
-         2px  2px 0 yellow;
+        2px -2px 0 yellow,
+        -2px 2px 0 yellow,
+        2px 2px 0 yellow;
       z-index: 100;
       pointer-events: none;
+      top: 5vh;
+      /* Un poco más abajo */
     }
 
     /* Mundo (escenario grande) */
@@ -37,7 +50,8 @@
       position: absolute;
       left: 0;
       top: 0;
-      width: 3000px; /* ancho total del mundo */
+      width: 3000px;
+      /* ancho total del mundo */
       height: 100vh;
       transform: translateX(0);
       z-index: 1;
@@ -51,10 +65,33 @@
       opacity: 0.95;
       z-index: 20;
     }
-    .nube::before, .nube::after { content: ""; position: absolute; background: white; border-radius: 50%; }
-    .nube.pequeña { width: 60px; height: 40px; }
-    .nube.pequeña::before { width: 30px; height: 30px; left: -15px; top: 5px; }
-    .nube.pequeña::after { width: 30px; height: 30px; right: -15px; top: 5px; }
+
+    .nube::before,
+    .nube::after {
+      content: "";
+      position: absolute;
+      background: white;
+      border-radius: 50%;
+    }
+
+    .nube.pequeña {
+      width: 60px;
+      height: 40px;
+    }
+
+    .nube.pequeña::before {
+      width: 30px;
+      height: 30px;
+      left: -15px;
+      top: 5px;
+    }
+
+    .nube.pequeña::after {
+      width: 30px;
+      height: 30px;
+      right: -15px;
+      top: 5px;
+    }
 
     /* Suelo */
     .suelo {
@@ -68,6 +105,28 @@
       z-index: 10;
     }
 
+    /* Obstaculos */
+    .obstaculo {
+      position: absolute;
+      background: #8B0000;
+      /* Rojo oscuro peligroso */
+      border: 2px solid #5a0000;
+      z-index: 15;
+      box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.5);
+    }
+
+    .obstaculo::after {
+      content: "!";
+      color: white;
+      position: absolute;
+      width: 100%;
+      text-align: center;
+      top: 50%;
+      transform: translateY(-50%);
+      font-weight: bold;
+      font-family: monospace;
+    }
+
     /* Personaje */
     .personaje {
       position: fixed;
@@ -77,7 +136,13 @@
       pointer-events: none;
       transform-origin: center;
     }
-    .personaje img { width: 100%; height: 100%; object-fit: contain; display:block; }
+
+    .personaje img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      display: block;
+    }
 
     /* --- CONTROLES MÓVILES --- */
     #controles {
@@ -86,33 +151,42 @@
       left: 0;
       width: 100%;
       padding: 10px;
-      z-index: 500; /* Asegura que estén por encima de todo */
+      z-index: 500;
+      /* Asegura que estén por encima de todo */
       display: flex;
       justify-content: space-between;
-      pointer-events: none; /* Permite clicks en los botones, pero no en el contenedor */
+      pointer-events: none;
+      /* Permite clicks en los botones, pero no en el contenedor */
     }
 
     .boton {
-      width: 60px;
-      height: 60px;
+      width: 15vmin;
+      /* Escala según el lado más pequeño de la pantalla */
+      height: 15vmin;
+      max-width: 80px;
+      max-height: 80px;
+      min-width: 50px;
+      min-height: 50px;
       background: rgba(0, 0, 0, 0.6);
       border: 3px solid white;
       border-radius: 50%;
       color: white;
-      font-size: 24px;
+      font-size: 6vmin;
       display: flex;
       align-items: center;
       justify-content: center;
       cursor: pointer;
       user-select: none;
-      pointer-events: all; /* Hace que el botón sea clickeable/táctil */
-      touch-action: manipulation; /* Optimiza para interacción táctil */
+      pointer-events: all;
+      /* Hace que el botón sea clickeable/táctil */
+      touch-action: manipulation;
+      /* Optimiza para interacción táctil */
       box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
     }
-    
+
     .boton:active {
-        background: rgba(255, 255, 255, 0.8);
-        color: black;
+      background: rgba(255, 255, 255, 0.8);
+      color: black;
     }
 
     #dpad {
@@ -124,19 +198,40 @@
     #salto {
       margin-right: 20px;
     }
-    
+
     /* Pequeño ajuste para pantallas más pequeñas */
     @media (max-width: 600px) {
-        .boton {
-            width: 50px;
-            height: 50px;
-            font-size: 20px;
-        }
+      .boton {
+        width: 50px;
+        height: 50px;
+        font-size: 20px;
+      }
+    }
+
+    #ui-nivel {
+      position: fixed;
+      top: 20px;
+      left: 20px;
+      font-size: min(6vw, 30px);
+      /* Responsivo */
+      font-weight: bold;
+      color: white;
+      text-shadow: 2px 2px 0 #000;
+      z-index: 1000;
+      font-family: Arial, sans-serif;
+    }
+
+    /* Ocultar controles en PC si se desea, o mostrarlos siempre */
+    @media (hover: hover) and (pointer: fine) {
+      /* Opcional: Podríamos ocultar botones en PC, pero 
+          los dejaremos para pruebas fáciles con mouse */
     }
   </style>
 </head>
+
 <body>
   <h1>COLA LEGENDS</h1>
+  <div id="ui-nivel">NIVEL: 1</div>
 
   <div class="mundo" id="mundo">
     <div class="nube pequeña" style="top: 80px; left: 100px;"></div>
@@ -166,7 +261,7 @@
     const mundo = document.getElementById('mundo');
     const personajeEl = document.getElementById('personaje');
     const sprite = document.getElementById('sprite');
-    
+
     // ELEMENTOS DE CONTROL MÓVIL
     const btnLeft = document.getElementById('btnLeft');
     const btnRight = document.getElementById('btnRight');
@@ -174,14 +269,183 @@
 
     // SPRITES (ajusta rutas si es necesario)
     const imgParado = "img/cola.png";
-    const imgCam1   = "img/cola1.png";
-    const imgCam2   = "img/cola2.png";
+    const imgCam1 = "img/cola1.png";
+    const imgCam2 = "img/cola2.png";
     const imgSaltar = "img/cola3.png";
+
+    // GENERACIÓN DE NIVELES Y OBSTÁCULOS
+    let nivel = 1;
+    let elementosObstaculos = [];
+
+    function randomInt(min, max) {
+      return Math.floor(Math.random() * (max - min + 1) + min);
+    }
+
+    function getRandomColor() {
+      const letters = '0123456789ABCDEF';
+      let color = '#';
+      for (let i = 0; i < 6; i++) {
+        color += letters[Math.floor(Math.random() * 16)];
+      }
+      return color;
+    }
+
+    function iniciarNivel(n) {
+      // 1. Actualizar UI
+      nivel = n;
+      const ui = document.getElementById('ui-nivel');
+      if (ui) ui.innerText = 'NIVEL: ' + nivel;
+
+      // 2. Limpiar obstáculos viejos
+      elementosObstaculos.forEach(obj => obj.element.remove());
+      elementosObstaculos = [];
+
+      // 3. Generar nuevos obstáculos
+      // Cantidad aumenta con el nivel, color aleatorio por nivel
+      const cantidad = 4 + nivel;
+      const nivelColor = getRandomColor();
+
+      for (let i = 0; i < cantidad; i++) {
+        // Posición X aleatoria (evitando el inicio 0-500 para no matar al jugador al spawnear)
+        const posX = randomInt(500, 2800);
+        const w = randomInt(40, 80);
+        const h = randomInt(40, 100);
+
+        const el = document.createElement('div');
+        el.classList.add('obstaculo');
+        el.style.width = w + 'px';
+        el.style.height = h + 'px';
+        el.style.left = posX + 'px';
+        el.style.bottom = '120px';
+        el.style.backgroundColor = nivelColor; // Color del nivel
+        el.style.borderColor = "black";
+
+        mundo.appendChild(el);
+        elementosObstaculos.push({
+          element: el,
+          x: posX,
+          y: 120,
+          w: w,
+          h: h
+        });
+      }
+    }
+
+    // Iniciar primer nivel
+    iniciarNivel(1);
 
     // CONFIG MUNDO
     let anchoMundo = 3000;
     let anchoPantalla = window.innerWidth;
     let desplazamientoMundo = 0;
+
+    // AUDIO (Sintetizador simple para no depender de archivos externos)
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+    function playSound(type) {
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+
+      if (type === 'jump') {
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(150, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(300, audioCtx.currentTime + 0.1);
+        gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.1);
+      } else if (type === 'bump') {
+        // Sonido de golpe (cabeza contra bloque)
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(100, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.1);
+      } else if (type === 'level') {
+        // Sonido de victoria
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(400, audioCtx.currentTime);
+        osc.frequency.linearRampToValueAtTime(800, audioCtx.currentTime + 0.1);
+        osc.frequency.linearRampToValueAtTime(1200, audioCtx.currentTime + 0.3);
+        gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.6);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.6);
+      }
+    }
+
+    // --- MUSICA DE FONDO (Secuenciador Simple) ---
+    let musicPlaying = false;
+    let musicTimeout;
+
+    // Una melodía más larga y variada (Estilo Mario Simple)
+    const melody = [
+      // Intro
+      { f: 330, d: 0.2 }, { f: 330, d: 0.2 }, { f: 0, d: 0.2 }, { f: 330, d: 0.2 },
+      { f: 0, d: 0.2 }, { f: 261, d: 0.2 }, { f: 330, d: 0.4 }, { f: 392, d: 0.4 },
+      { f: 0, d: 0.4 }, { f: 196, d: 0.4 }, { f: 0, d: 0.4 },
+      // Parte Principal
+      { f: 261, d: 0.3 }, { f: 0, d: 0.15 }, { f: 196, d: 0.3 }, { f: 0, d: 0.15 }, { f: 164, d: 0.3 },
+      { f: 0, d: 0.15 }, { f: 220, d: 0.3 }, { f: 246, d: 0.3 }, { f: 233, d: 0.15 }, { f: 220, d: 0.3 },
+      { f: 196, d: 0.2 }, { f: 330, d: 0.2 }, { f: 392, d: 0.2 }, { f: 440, d: 0.2 },
+      { f: 349, d: 0.2 }, { f: 392, d: 0.2 }, { f: 0, d: 0.2 }, { f: 330, d: 0.2 },
+      { f: 261, d: 0.2 }, { f: 293, d: 0.2 }, { f: 246, d: 0.4 }, { f: 0, d: 0.2 },
+      { f: 261, d: 0.3 }, { f: 0, d: 0.15 }, { f: 196, d: 0.3 }, { f: 0, d: 0.15 }, { f: 164, d: 0.3 },
+      { f: 0, d: 0.15 }, { f: 220, d: 0.3 }, { f: 246, d: 0.3 }, { f: 233, d: 0.15 }, { f: 220, d: 0.3 },
+      { f: 196, d: 0.2 }, { f: 330, d: 0.2 }, { f: 392, d: 0.2 }, { f: 440, d: 0.2 },
+      { f: 349, d: 0.2 }, { f: 392, d: 0.2 }, { f: 0, d: 0.2 }, { f: 330, d: 0.2 },
+      { f: 261, d: 0.2 }, { f: 293, d: 0.2 }, { f: 246, d: 0.4 }, { f: 0, d: 0.2 },
+      { f: 261, d: 0.3 }, { f: 0, d: 0.15 }, { f: 196, d: 0.3 }, { f: 0, d: 0.15 }, { f: 164, d: 0.3 },
+      { f: 0, d: 0.15 }, { f: 220, d: 0.3 }, { f: 246, d: 0.3 }, { f: 233, d: 0.15 }, { f: 220, d: 0.3 },
+      { f: 196, d: 0.2 }, { f: 330, d: 0.2 }, { f: 392, d: 0.2 }, { f: 440, d: 0.2 },
+      { f: 349, d: 0.2 }, { f: 392, d: 0.2 }, { f: 0, d: 0.2 }, { f: 330, d: 0.2 },
+      { f: 2619, d: 1 }, { f: 293, d: 0.2 }, { f: 246, d: 0.4 }, { f: 0, d: 0.2 },
+    ];
+    let noteIndex = 0;
+
+    function playMusicLoop() {
+      if (!musicPlaying) return;
+
+      const note = melody[noteIndex];
+      noteIndex = (noteIndex + 1) % melody.length;
+
+      // Calcular factor de velocidad basado en el nivel
+      // Nivel 1 = 1.0, Nivel 2 = 1.1, etc...
+      const speedFactor = 1 + (nivel - 1) * 0.1;
+      const duration = note.d / speedFactor;
+
+      if (note.f > 0) {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(note.f, audioCtx.currentTime);
+        // Volumen bajo para fondo
+        gain.gain.setValueAtTime(0.03, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+
+        osc.start();
+        osc.stop(audioCtx.currentTime + duration);
+      }
+
+      // Programar siguiente nota (tiempo ajustado)
+      musicTimeout = setTimeout(playMusicLoop, duration * 1000);
+    }
+
+    function startMusic() {
+      if (musicPlaying) return;
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+
+      musicPlaying = true;
+      playMusicLoop();
+    }
 
     // PERSONAJE
     let xWorld = 200;
@@ -201,21 +465,25 @@
 
     // teclas (objeto que controla el estado de los inputs, ya sea teclado o táctil)
     const teclas = { ArrowLeft: false, ArrowRight: false, ArrowUp: false };
-    
+
     // --- LÓGICA DE INPUT UNIFICADA ---
 
     // 1. Teclado
-    window.addEventListener('keydown', e => { if (e.code in teclas) teclas[e.code] = true; });
-    window.addEventListener('keyup',   e => { if (e.code in teclas) teclas[e.code] = false; });
-    
+    window.addEventListener('keydown', e => {
+      startMusic(); // Iniciar música al interactuar
+      if (e.code in teclas) teclas[e.code] = true;
+    });
+    window.addEventListener('keyup', e => { if (e.code in teclas) teclas[e.code] = false; });
+
     // 2. Táctil / Mouse (Mantiene el botón presionado)
-    
+
     function setKey(code, value) {
-        if (code in teclas) {
-            teclas[code] = value;
-        }
+      if (value) startMusic(); // Iniciar música al tocar
+      if (code in teclas) {
+        teclas[code] = value;
+      }
     }
-    
+
     // Eventos para el botón Izquierda
     btnLeft.addEventListener('touchstart', (e) => { e.preventDefault(); setKey('ArrowLeft', true); });
     btnLeft.addEventListener('touchend', (e) => { e.preventDefault(); setKey('ArrowLeft', false); });
@@ -244,11 +512,23 @@
       if (teclas.ArrowLeft && !teclas.ArrowRight) { xWorld -= velocidadX; facing = -1; }
       if (teclas.ArrowRight && !teclas.ArrowLeft) { xWorld += velocidadX; facing = 1; }
 
-      // limitar X dentro del mundo
-      xWorld = Math.max(0, Math.min(xWorld, anchoMundo - anchoPersonaje));
+      // Limites del mundo
+      if (xWorld < 0) xWorld = 0;
+
+      // Si llega al final derecho -> "Siguiente Nivel" (ciclo)
+      if (xWorld > anchoMundo - anchoPersonaje) {
+        playSound('level');
+        xWorld = 200; // Reset posición
+        // Siguiente Nivel
+        iniciarNivel(nivel + 1);
+        console.log("¡Nivel Completado! Avanzando al nivel " + nivel);
+
+        mundo.style.transition = 'none';
+      }
 
       // salto
       if (teclas.ArrowUp && enSuelo) {
+        playSound('jump');
         velocidadY = -fuerzaSalto;
         enSuelo = false;
       }
@@ -260,6 +540,67 @@
         y = alturaSuelo;
         velocidadY = 0;
         enSuelo = true;
+      }
+
+      // --- DETECCIÓN DE COLISIONES ---
+      // Personaje hitbox (AJUSTADO: Pixel Perfect)
+      // Padding en 0 para que colisione EXACTAMENTE con la imagen visible
+      const hitboxPaddingX = 0;
+      const hitboxPaddingY = 0;
+
+      const pjLeft = xWorld + hitboxPaddingX;
+      const pjRight = xWorld + anchoPersonaje - hitboxPaddingX;
+      const pjBottom = y;
+      const pjTop = y + 100 - hitboxPaddingY;
+
+      for (let obs of elementosObstaculos) {
+        // Obstaculo hitbox (le damos un pequeño margen interno de 5px también)
+        const obsPadding = 5;
+        const obsLeft = obs.x + obsPadding;
+        const obsRight = obs.x + obs.w - obsPadding;
+        const obsBottom = obs.y + obsPadding;
+        const obsTop = obs.y + obs.h - obsPadding;
+
+        // AABB Collision (Axis-Aligned Bounding Box)
+        // AABB Collision (Axis-Aligned Bounding Box)
+        // Check if boxes overlap
+        if (pjRight > obsLeft &&
+          pjLeft < obsRight &&
+          pjTop > obsBottom &&
+          pjBottom < obsTop) {
+
+          // COLISIÓN DETECTADA - Resolución de Físicas sólida
+
+          // Calculamos cuánto penetra el personaje en el obstáculo por cada lado (overlaps)
+          const overlapLeft = pjRight - obsLeft;
+          const overlapRight = obsRight - pjLeft;
+          const overlapTop = pjTop - obsBottom;    // Golpeando desde abajo (cabeza)
+          const overlapBottom = obsTop - pjBottom;    // Cayendo desde arriba (pies)
+
+          // Buscamos la penetración más pequeña para resolver por el camino más corto
+          const minOverlap = Math.min(overlapLeft, overlapRight, overlapTop, overlapBottom);
+
+          if (minOverlap === overlapLeft) {
+            // Chocó por la izquierda (caminando a la derecha)
+            // Resolvemos moviendo al personaje a la izquierda
+            // xWorld + hitBoxPaddingX + width - overlap = borde.
+            // Simplificado: empujamos xWorld hacia atrás
+            xWorld -= overlapLeft;
+          } else if (minOverlap === overlapRight) {
+            // Chocó por la derecha (caminando a la izquierda)
+            xWorld += overlapRight;
+          } else if (minOverlap === overlapBottom) {
+            // Cayó encima del obstáculo
+            y += overlapBottom;
+            velocidadY = 0;
+            enSuelo = true; // Permite volver a saltar
+          } else if (minOverlap === overlapTop) {
+            // Golpeó el obstáculo con la cabeza saltando
+            playSound('bump');
+            y -= overlapTop;
+            velocidadY = 0; // Detiene la subida
+          }
+        }
       }
 
       // animación sprite
@@ -303,14 +644,17 @@
       personajeEl.style.bottom = `${Math.round(y)}px`;
 
       // Centro el sprite en el punto (uso translateX(-50%)) y lo volteo si hace falta
-      personajeEl.style.transform = `translateX(-50%) scaleX(${facing})`;
+      // AJUSTE: Quitamos translateX(-50%) para que xWorld sea la ESQUINA IZQUIERDA EXACTA
+      // Esto alinea la hitbox lógica con la visual.
+      personajeEl.style.transform = `scaleX(${facing})`;
 
       requestAnimationFrame(actualizar);
     }
-//ajuse
+    //ajuse
     // iniciargit
     // Prueba
     actualizar();
   </script>
 </body>
+
 </html>
