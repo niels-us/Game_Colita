@@ -232,65 +232,12 @@
     .ui-text {
       font-size: min(6vw, 30px);
     }
-
-    /* INDICADOR DE ROTACIÓN */
-    #rotate-device {
-      display: none;
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: #000;
-      color: #fff;
-      z-index: 9999;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      text-align: center;
-      font-size: 24px;
-    }
-
-    #rotate-device svg {
-      width: 60px;
-      height: 60px;
-      margin-bottom: 20px;
-      fill: white;
-      animation: rotate-icon 2s infinite;
-    }
-
-    @keyframes rotate-icon {
-      0% {
-        transform: rotate(0deg);
-      }
-
-      50% {
-        transform: rotate(-90deg);
-      }
-
-      100% {
-        transform: rotate(0deg);
-      }
-    }
-
-    /* Mostrar overlay si la pantalla es vertical (portrait) en móviles */
-    @media screen and (orientation: portrait) and (max-width: 900px) {
-      #rotate-device {
-        display: flex;
-      }
-    }
   </style>
 </head>
 
 <body>
 
-  <!-- Overlay para pedir rotación -->
-  <div id="rotate-device">
-    <svg viewBox="0 0 24 24">
-      <path d="M17 1H7c-1.1 0-2 .9-2 2v18c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2V3c0-1.1-.9-2-2-2zm0 18H7V5h10v14z" />
-    </svg>
-    Por favor, gira tu dispositivo 🔄
-  </div>
+
 
   <h1>COLA LEGENDS</h1>
 
