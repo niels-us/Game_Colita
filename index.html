@@ -55,6 +55,8 @@
       height: 100vh;
       transform: translateX(0);
       z-index: 1;
+      will-change: transform;
+      /* Hint para el navegador */
     }
 
     /* Nubes */
@@ -112,7 +114,9 @@
       /* Rojo oscuro peligroso */
       border: 2px solid #5a0000;
       z-index: 15;
-      box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.5);
+      /* Optimización móvil: menos sombras complejas */
+      box-shadow: 2px 2px 0px rgba(0, 0, 0, 0.5);
+      will-change: transform;
     }
 
     .obstaculo::after {
@@ -134,7 +138,9 @@
       height: 100px;
       z-index: 200;
       pointer-events: none;
-      transform-origin: center;
+      /* Optimización: usar transform en lugar de left/top siempre que sea posible */
+      will-change: transform;
+      /* Eliminamos transform-origin por defecto para control manual simple */
     }
 
     .personaje img {
@@ -745,17 +751,42 @@
       // recalcular screenX con desplazamiento final
       screenX = xWorld - desplazamientoMundo;
 
-      // Aplicar transform al mundo (mueve nubes/suelo)
-      mundo.style.transform = `translateX(${-Math.round(desplazamientoMundo)}px)`;
+      // Aplicar transform al mundo (mueve nubes/suelo) usando translate3d para GPU
+      mundo.style.transform = `translate3d(${-Math.round(desplazamientoMundo)}px, 0, 0)`;
 
-      // Posicionar personaje en pantalla (left = punto central del sprite)
-      personajeEl.style.left = `${Math.round(screenX)}px`;
-      personajeEl.style.bottom = `${Math.round(y)}px`;
+      // Optimización: Mover personaje usando translate3d en lugar de left/bottom
+      // left se elimina del CSS o se deja en 0, todo se maneja con transform
+      // translate3d(x, y, 0). 
+      // OJO: 'y' en CSS transform es hacia abajo. 
+      // Nuestra variable 'y' es "altura desde abajo". 
+      // Necesitamos calcular la posición TOP relativa al viewport.
+      // alturaPantalla (vh) - y - alturaPersonaje
 
-      // Centro el sprite en el punto (uso translateX(-50%)) y lo volteo si hace falta
-      // AJUSTE: Quitamos translateX(-50%) para que xWorld sea la ESQUINA IZQUIERDA EXACTA
-      // Esto alinea la hitbox lógica con la visual.
-      personajeEl.style.transform = `scaleX(${facing})`;
+      // Para simplificar y no romper coordenadas: 
+      // Mantendremos 'bottom' en JS pero usaremos 'left' dentro del transform para el eje X
+      // O mejor: usar translate3d completo.
+      // ScreenX es la posición horizontal.
+      // Y es la posición desde abajo.
+
+      // Solución Híbrida segura:
+      // Usamos 'left: 0' y 'bottom: 0' fijos en CSS (ajustar luego si hace falta)
+      // Y aquí movemos todo con transform.
+
+      // Por ahora, para asegurar compatibilidad con el código actual, solo optimizamos X con transform
+      // y Y la dejamos o la optimizamos también.
+
+      // Vamos a usar la técnica de: left se actualiza poco, transform mucho? No.
+      // MEJOR: Position fixed + transform translate3d(screenX, -bottomOffset, 0)
+
+      // Como 'personaje' tiene position: fixed
+      // left: 0, bottom: 0 (lo forzaremos en línea abajo para asegurar)
+      personajeEl.style.left = '0px';
+      personajeEl.style.bottom = '0px';
+
+      // Invertimos Y porque CSS translate Y positivo es hacia abajo.
+      // Queremos que esté a 'y' pixeles del fondo.
+      // Si bottom es 0, translate(0, -y) lo sube.
+      personajeEl.style.transform = `translate3d(${Math.round(screenX)}px, ${-Math.round(y)}px, 0) scaleX(${facing})`;
 
       requestAnimationFrame(actualizar);
     }
