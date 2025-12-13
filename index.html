@@ -232,6 +232,78 @@
     .ui-text {
       font-size: min(6vw, 30px);
     }
+
+    #ui-vidas {
+      color: #ff4444;
+    }
+
+    /* Enemigo Cola-Pick */
+    .enemigo {
+      position: absolute;
+      width: 80px;
+      height: 80px;
+      z-index: 100;
+      pointer-events: none;
+      /* Animación simple de flotación o caminar si se quiere */
+    }
+
+    .enemigo img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+
+    /* Modal Game Over */
+    #modal-gameover {
+      display: none;
+      /* Hidden by default */
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.8);
+      /* Fondo oscuro semitransparente */
+      z-index: 2000;
+      /* Encima de todo */
+      justify-content: center;
+      align-items: center;
+      flex-direction: column;
+      color: white;
+      text-align: center;
+    }
+
+    #modal-gameover h2 {
+      font-size: min(10vw, 60px);
+      margin-bottom: 20px;
+      color: #ff4444;
+      text-shadow: 3px 3px 0 #000;
+      font-family: 'Arial Black', sans-serif;
+    }
+
+    #modal-gameover p {
+      font-size: min(6vw, 30px);
+      margin-bottom: 30px;
+      color: #fff;
+      text-shadow: 1px 1px 0 #000;
+    }
+
+    #modal-gameover button {
+      padding: 15px 40px;
+      font-size: min(6vw, 24px);
+      background: #4CAF50;
+      color: white;
+      border: 3px solid #fff;
+      border-radius: 50px;
+      cursor: pointer;
+      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
+      font-weight: bold;
+      transition: transform 0.1s;
+    }
+
+    #modal-gameover button:active {
+      transform: scale(0.95);
+    }
   </style>
 </head>
 
@@ -244,6 +316,8 @@
   <div id="ui-stats">
     <div id="ui-world" class="ui-text">WORLD: 1</div>
     <div id="ui-nivel" class="ui-text">NIVEL: 1</div>
+    <div id="ui-score" class="ui-text">PTS: 0</div>
+    <div id="ui-vidas" class="ui-text">❤❤❤❤❤</div>
   </div>
 
   <div class="mundo" id="mundo">
@@ -258,6 +332,13 @@
 
   <div class="personaje" id="personaje">
     <img id="sprite" src="img/cola1.png" alt="Personaje">
+  </div>
+
+  <!-- Modal Game Over -->
+  <div id="modal-gameover">
+    <h2>GAME OVER</h2>
+    <p>Puntuación: <span id="score-final">0</span></p>
+    <button id="btn-restart">Volver a Jugar</button>
   </div>
 
   <div id="controles">
@@ -280,6 +361,36 @@
     const btnRight = document.getElementById('btnRight');
     const btnUp = document.getElementById('btnUp');
 
+    // --- VARIABLES GLOBALES DEL JUEGO ---
+    // PERSONAJE
+    let xWorld = 200;
+    let y = 100;
+    let velocidadY = 0;
+    let enSuelo = true;
+    let vidas = 5;
+    let score = 0; // Puntuación
+    let isDead = false; // Estado de muerte
+
+    // ENEMIGOS
+    let enemigos = [];
+    const imgEnemigo = "img/cola-pick2.png";
+
+    // CONFIG JUEGO
+    const gravedad = 1;
+    const fuerzaSalto = 18;
+    const velocidadX = 6;
+    const alturaSuelo = 100;
+    const anchoPersonaje = 100;
+
+    // ANIMACIÓN
+    let animTick = 0;
+    let facing = 1;
+
+    // GENERACIÓN DE NIVELES
+    let world = 1;
+    let nivel = 1;
+    let elementosObstaculos = [];
+
     // SPRITES (ajusta rutas si es necesario)
     const imgParado = "img/cola.png";
     const imgCam1 = "img/cola1.png";
@@ -287,9 +398,7 @@
     const imgSaltar = "img/cola3.png";
 
     // GENERACIÓN DE NIVELES Y OBSTÁCULOS
-    let world = 1;
-    let nivel = 1;
-    let elementosObstaculos = [];
+    // (Variables definidas arriba)
 
     function randomInt(min, max) {
       return Math.floor(Math.random() * (max - min + 1) + min);
@@ -313,7 +422,7 @@
 
     function iniciarNivel(nuevoNivel, nuevoWorld = false) {
       // Lógica de progresión
-      // Si nuevoWorld es true, es porque forzamos cambio (inicio) 
+      // Si nuevoWorld es true, es porque forzamos cambio (inicio)
       // Si no, verificamos el ciclo de 10 niveles
 
       // Ajuste de variables globales
@@ -331,6 +440,7 @@
       const uiWorld = document.getElementById('ui-world');
       if (uiNivel) uiNivel.innerText = 'NIVEL: ' + nivel;
       if (uiWorld) uiWorld.innerText = 'WORLD: ' + world;
+      updateScoreUI();
 
       // 2. Si cambiamos de mundo, cambiamos fondo
       if (nuevoWorld) {
@@ -342,9 +452,8 @@
       elementosObstaculos = [];
 
       // 4. Generar nuevos obstáculos
-      // La dificultad base aumenta con el mundo también? 
-      // Digamos que la cantidad base es (World * 2) + Nivel
-      const cantidad = 3 + (world * 1) + nivel;
+      // Ajuste a 25 obstáculos fijos distribuidos aleatoriamente
+      const cantidad = 18;
       const nivelColor = getRandomColor(); // Obstáculos color aleatorio siempre
 
       for (let i = 0; i < cantidad; i++) {
@@ -368,10 +477,35 @@
           x: posX,
           y: 120,
           w: w,
-          h: h
+          h: h,
+          passed: false
         });
       }
     }
+
+    // 5. Generar Enemigo Cola-Pick (Uno por nivel, en medio)
+    enemigos.forEach(e => e.element.remove());
+    enemigos = [];
+
+    // Spawnear en una posición aleatoria lejana pero transitable
+    const enemyX = randomInt(800, 2500);
+    const enemyEl = document.createElement('div');
+    enemyEl.classList.add('enemigo');
+    enemyEl.innerHTML = `<img src="${imgEnemigo}" alt="Cola-Pick">`;
+    enemyEl.style.left = enemyX + 'px';
+    enemyEl.style.bottom = '120px'; // Sobre el suelo
+    mundo.appendChild(enemyEl);
+
+    enemigos.push({
+      element: enemyEl,
+      x: enemyX,
+      y: 120,
+      w: 80,
+      h: 80,
+      dir: 1, // 1 derecha, -1 izquierda
+      speed: 2 // velocidad de patrulla
+    });
+
 
     // Iniciar juego: Nivel 1, y forzamos updateBackground (nuevoWorld=true implícito en lógica inicial si queremos, o manual)
     // Para que empiece con el color default (azul cielo) podemos no llamar updateBackground,
@@ -381,7 +515,7 @@
     // "al inicio del juego este en world 1 ... cada cambio de mundo cambia ... asi se aprecia el nuevo mundo"
     // Haremos que cambie desde ya para probar.
     iniciarNivel(1, false); // false para mantener el azul original al principio si se quiere, o true para random.
-    // El usuario pide "cambia de forma aleatoria", dejaré el azul por defecto en CSS y solo cambiará al World 2. 
+    // El usuario pide "cambia de forma aleatoria", dejaré el azul por defecto en CSS y solo cambiará al World 2.
     // PERO si quiere "apreciar el nuevo mundo", mejor que cambie siempre.
 
     // Voy a forzar un color inicial aleatorio para World 1 si el usuario quiere "sensación de mundos"
@@ -436,6 +570,26 @@
         gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.6);
         osc.start();
         osc.stop(audioCtx.currentTime + 0.6);
+      } else if (type === 'gameover') {
+        // Sonido de Game Over
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(200, audioCtx.currentTime);
+        osc.frequency.linearRampToValueAtTime(50, audioCtx.currentTime + 0.8);
+        gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+        gain.gain.linearRampToValueAtTime(0.01, audioCtx.currentTime + 0.8);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.8);
+      } else if (type === 'gameover_long') {
+        // Sonido MUY largo de derrota (caída)
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(400, audioCtx.currentTime);
+        osc.frequency.linearRampToValueAtTime(100, audioCtx.currentTime + 2.5);
+
+        gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+        gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 2.5);
+
+        osc.start();
+        osc.stop(audioCtx.currentTime + 2.5);
       }
     }
 
@@ -513,38 +667,21 @@
       tryFullScreen();
     }
 
-    // PERSONAJE
-    let xWorld = 200;
-    let y = 100;
-    let velocidadY = 0;
-    let enSuelo = true;
 
-    const gravedad = 1;
-    const fuerzaSalto = 18;
-    const velocidadX = 6;
-    const alturaSuelo = 100;
-    const anchoPersonaje = 100; // Lo mantenemos aquí para la lógica de límites
-
-    // animación
-    let animTick = 0;
-    let facing = 1; // 1 derecha, -1 izquierda
-
-    // teclas (objeto que controla el estado de los inputs, ya sea teclado o táctil)
-    const teclas = { ArrowLeft: false, ArrowRight: false, ArrowUp: false };
 
     // --- LÓGICA DE INPUT UNIFICADA ---
+    const teclas = { ArrowLeft: false, ArrowRight: false, ArrowUp: false };
 
     // 1. Teclado
     window.addEventListener('keydown', e => {
-      handleInteraction(); // Intentar fullscreen/música siempre
+      handleInteraction();
       if (e.code in teclas) teclas[e.code] = true;
     });
     window.addEventListener('keyup', e => { if (e.code in teclas) teclas[e.code] = false; });
 
-    // 2. Táctil / Mouse (Mantiene el botón presionado)
-
+    // 2. Táctil / Mouse
     function setKey(code, value) {
-      if (value) handleInteraction(); // Intentar fullscreen/música al tocar
+      if (value) handleInteraction();
       if (code in teclas) {
         teclas[code] = value;
       }
@@ -574,6 +711,21 @@
     });
 
     function actualizar() {
+      // Si está muerto, ejecutar animación de muerte y salir
+      if (isDead) {
+        velocidadY += gravedad;
+        y -= velocidadY;
+        // Sin colisión con suelo, cae al vacío
+        personajeEl.style.bottom = `${Math.round(y)}px`; // Actualizar visual Y
+        // Mover solo Y visualmente en CSS transform si optimizamos, pero aquí simple:
+        // Necesitamos actualizar el transform ya que es lo que se renderiza
+        // Nota: screenX sigue siendo valido.
+        personajeEl.style.transform = `translate3d(${Math.round(xWorld - desplazamientoMundo)}px, ${-Math.round(y)}px, 0)`;
+
+        requestAnimationFrame(actualizar);
+        return;
+      }
+
       // movimiento horizontal en coordenadas del mundo (usa las mismas 'teclas' para teclado/táctil)
       if (teclas.ArrowLeft && !teclas.ArrowRight) { xWorld -= velocidadX; facing = -1; }
       if (teclas.ArrowRight && !teclas.ArrowLeft) { xWorld += velocidadX; facing = 1; }
@@ -586,6 +738,7 @@
         playSound('level');
         xWorld = 200; // Reset posición
         // Avanzamos nivel (la logica de World está dentro)
+        score += 100; // Puntos por nivel
         iniciarNivel(nivel + 1);
         console.log(`Nivel Completado! World ${world} - Nivel ${nivel}`);
 
@@ -620,6 +773,13 @@
       const pjTop = y + 100 - hitboxPaddingY;
 
       for (let obs of elementosObstaculos) {
+        // DETECTAR SI LOGRAMOS PASAR EL OBSTÁCULO (Sumar puntos)
+        if (!obs.passed && xWorld > obs.x + obs.w) {
+          obs.passed = true;
+          score += 10;
+          updateScoreUI();
+        }
+
         // Obstaculo hitbox (le damos un pequeño margen interno de 5px también)
         const obsPadding = 5;
         const obsLeft = obs.x + obsPadding;
@@ -707,13 +867,13 @@
 
       // Optimización: Mover personaje usando translate3d en lugar de left/bottom
       // left se elimina del CSS o se deja en 0, todo se maneja con transform
-      // translate3d(x, y, 0). 
-      // OJO: 'y' en CSS transform es hacia abajo. 
-      // Nuestra variable 'y' es "altura desde abajo". 
+      // translate3d(x, y, 0).
+      // OJO: 'y' en CSS translate Y positivo es hacia abajo.
+      // Nuestra variable 'y' es "altura desde abajo".
       // Necesitamos calcular la posición TOP relativa al viewport.
       // alturaPantalla (vh) - y - alturaPersonaje
 
-      // Para simplificar y no romper coordenadas: 
+      // Para simplificar y no romper coordenadas:
       // Mantendremos 'bottom' en JS pero usaremos 'left' dentro del transform para el eje X
       // O mejor: usar translate3d completo.
       // ScreenX es la posición horizontal.
@@ -739,7 +899,103 @@
       // Si bottom es 0, translate(0, -y) lo sube.
       personajeEl.style.transform = `translate3d(${Math.round(screenX)}px, ${-Math.round(y)}px, 0) scaleX(${facing})`;
 
+      // --- LÓGICA ENEMIGOS (Patrulla simple) ---
+      for (let enemy of enemigos) {
+        // Mover enemigo
+        enemy.x += enemy.speed * enemy.dir;
+
+        // Cambio de dirección simple (si choca con límites invisibles de patrulla o random)
+        // Haremos que patrulle 200px a la redonda de su spawn original?
+        // Mejor simple: rebote si se acerca a obstaculos o aleatorio.
+        // Rebote simple cada 100 frames o si toca borde mundo
+        if (Math.random() < 0.01) enemy.dir *= -1;
+        if (enemy.x < 0) enemy.dir = 1;
+        if (enemy.x > anchoMundo - 80) enemy.dir = -1;
+
+        enemy.element.style.left = enemy.x + 'px';
+        enemy.element.style.transform = `scaleX(${-enemy.dir})`; // Voltear sprite
+
+        // COLISIÓN CON ENEMIGO
+        // Hitbox simple
+        if (xWorld < enemy.x + enemy.w - 20 &&
+          xWorld + anchoPersonaje > enemy.x + 20 &&
+          y < enemy.y + enemy.h - 10 &&
+          y + 100 > enemy.y + 10) {
+
+          // DAÑO
+          console.log("¡Daño por enemigo!");
+          // Empujón fuerte
+          xWorld -= 100;
+          playSound('bump');
+
+          // Restar vida
+          takeDamage();
+        }
+      }
+
       requestAnimationFrame(actualizar);
+    }
+
+    function takeDamage() {
+      if (isDead) return;
+
+      vidas--;
+      updateLivesUI();
+      document.body.style.backgroundColor = "red"; // Flash rojo
+      setTimeout(updateBackground, 100);
+
+      if (vidas <= 0) {
+        triggerGameOver();
+      }
+    }
+
+    function triggerGameOver() {
+      isDead = true;
+      playSound('gameover_long');
+
+      // Salto de muerte
+      velocidadY = -15; // Salto inicial
+      enSuelo = false;
+
+      // Esperar a que caiga (timeout simple o check de Y)
+      setTimeout(() => {
+        showGameOverModal();
+      }, 2000);
+    }
+
+    function showGameOverModal() {
+      const modal = document.getElementById('modal-gameover');
+      const scoreFinal = document.getElementById('score-final');
+      if (scoreFinal) scoreFinal.innerText = score;
+      modal.style.display = 'flex';
+    }
+
+    // Botón reiniciar
+    document.getElementById('btn-restart').addEventListener('click', () => {
+      document.getElementById('modal-gameover').style.display = 'none';
+      isDead = false;
+      vidas = 5;
+      score = 0;
+      world = 1;
+      nivel = 1;
+      xWorld = 200;
+      y = 100;
+      velocidadY = 0;
+      updateLivesUI();
+      updateScoreUI();
+      iniciarNivel(1, true);
+    });
+
+    function updateLivesUI() {
+      const uiVidas = document.getElementById('ui-vidas');
+      let corazones = "";
+      for (let i = 0; i < vidas; i++) corazones += "❤";
+      if (uiVidas) uiVidas.innerText = corazones;
+    }
+
+    function updateScoreUI() {
+      const uiScore = document.getElementById('ui-score');
+      if (uiScore) uiScore.innerText = 'PTS: ' + score;
     }
     //ajuse
     // iniciargit
