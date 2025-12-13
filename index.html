@@ -558,7 +558,11 @@
 
       musicPlaying = true;
       playMusicLoop();
+    }
 
+    // Función Maestra de Interacción
+    function handleInteraction() {
+      startMusic();
       tryFullScreen();
     }
 
@@ -585,7 +589,7 @@
 
     // 1. Teclado
     window.addEventListener('keydown', e => {
-      startMusic(); // Iniciar música al interactuar
+      handleInteraction(); // Intentar fullscreen/música siempre
       if (e.code in teclas) teclas[e.code] = true;
     });
     window.addEventListener('keyup', e => { if (e.code in teclas) teclas[e.code] = false; });
@@ -593,7 +597,7 @@
     // 2. Táctil / Mouse (Mantiene el botón presionado)
 
     function setKey(code, value) {
-      if (value) startMusic(); // Iniciar música al tocar
+      if (value) handleInteraction(); // Intentar fullscreen/música al tocar
       if (code in teclas) {
         teclas[code] = value;
       }
