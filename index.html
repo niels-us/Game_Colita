@@ -253,6 +253,25 @@
       object-fit: contain;
     }
 
+    /* Clase de parpadeo para invulnerabilidad */
+    .parpadeo {
+      animation: blink 0.2s infinite;
+    }
+
+    @keyframes blink {
+      0% {
+        opacity: 1;
+      }
+
+      50% {
+        opacity: 0.3;
+      }
+
+      100% {
+        opacity: 1;
+      }
+    }
+
     /* Modal Game Over */
     #modal-gameover {
       display: none;
@@ -315,7 +334,7 @@
 
   <div id="ui-stats">
     <div id="ui-world" class="ui-text">WORLD: 1</div>
-    <div id="ui-nivel" class="ui-text">NIVEL: 1</div>
+    <div id="ui-nivel" class="ui-text">LEVEL: 1</div>
     <div id="ui-score" class="ui-text">PTS: 0</div>
     <div id="ui-vidas" class="ui-text">❤❤❤❤❤</div>
   </div>
@@ -370,6 +389,7 @@
     let vidas = 5;
     let score = 0; // Puntuación
     let isDead = false; // Estado de muerte
+    let isInvincible = false; // Estado de invulnerabilidad
 
     // ENEMIGOS
     let enemigos = [];
@@ -438,7 +458,7 @@
       // 1. Actualizar UI
       const uiNivel = document.getElementById('ui-nivel');
       const uiWorld = document.getElementById('ui-world');
-      if (uiNivel) uiNivel.innerText = 'NIVEL: ' + nivel;
+      if (uiNivel) uiNivel.innerText = 'LEVEL: ' + nivel;
       if (uiWorld) uiWorld.innerText = 'WORLD: ' + world;
       updateScoreUI();
 
@@ -483,28 +503,34 @@
       }
     }
 
-    // 5. Generar Enemigo Cola-Pick (Uno por nivel, en medio)
+    // Primero limpiamos los anteriores
     enemigos.forEach(e => e.element.remove());
     enemigos = [];
 
-    // Spawnear en una posición aleatoria lejana pero transitable
-    const enemyX = randomInt(800, 2500);
-    const enemyEl = document.createElement('div');
-    enemyEl.classList.add('enemigo');
-    enemyEl.innerHTML = `<img src="${imgEnemigo}" alt="Cola-Pick">`;
-    enemyEl.style.left = enemyX + 'px';
-    enemyEl.style.bottom = '120px'; // Sobre el suelo
-    mundo.appendChild(enemyEl);
+    for (let i = 0; i < 4; i++) {
+      // Spawnear en una posición aleatoria lejana pero transitable
+      // AUMENTADO: min 1000 para que no aparezcan al inicio
+      const enemyX = randomInt(1000, 2800);
+      const enemyEl = document.createElement('div');
+      enemyEl.classList.add('enemigo');
+      enemyEl.innerHTML = `<img src="${imgEnemigo}" alt="Cola-Pick">`;
+      enemyEl.style.left = enemyX + 'px';
+      enemyEl.style.bottom = '120px'; // Sobre el suelo
+      mundo.appendChild(enemyEl);
 
-    enemigos.push({
-      element: enemyEl,
-      x: enemyX,
-      y: 120,
-      w: 80,
-      h: 80,
-      dir: 1, // 1 derecha, -1 izquierda
-      speed: 2 // velocidad de patrulla
-    });
+      enemigos.push({
+        element: enemyEl,
+        x: enemyX,
+        y: 120,
+        w: 80,
+        h: 80,
+        dir: (Math.random() > 0.5) ? 1 : -1, // Dirección inicial aleatoria
+        speed: 2 // velocidad de patrulla
+      });
+    }
+
+
+
 
 
     // Iniciar juego: Nivel 1, y forzamos updateBackground (nuevoWorld=true implícito en lógica inicial si queremos, o manual)
@@ -922,14 +948,15 @@
           y < enemy.y + enemy.h - 10 &&
           y + 100 > enemy.y + 10) {
 
-          // DAÑO
-          console.log("¡Daño por enemigo!");
-          // Empujón fuerte
-          xWorld -= 100;
-          playSound('bump');
+          if (!isInvincible) {
+            // DAÑO SOLO SI NO ES INVENCIBLE
+            console.log("¡Daño por enemigo!");
+            // Empujón fuerte
+            xWorld -= 100;
+            playSound('bump');
 
-          // Restar vida
-          takeDamage();
+            takeDamage();
+          }
         }
       }
 
@@ -937,7 +964,16 @@
     }
 
     function takeDamage() {
-      if (isDead) return;
+      if (isDead || isInvincible) return;
+
+      isInvincible = true;
+      personajeEl.classList.add('parpadeo');
+
+      // 5 segundos de gracia
+      setTimeout(() => {
+        isInvincible = false;
+        personajeEl.classList.remove('parpadeo');
+      }, 5000);
 
       vidas--;
       updateLivesUI();
