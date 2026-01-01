@@ -323,6 +323,31 @@
     #modal-gameover button:active {
       transform: scale(0.95);
     }
+
+    /* Texto flotante (+1 Vida) */
+    .floating-text {
+      position: absolute;
+      color: #ff4444;
+      /* Rojo corazón */
+      font-weight: bold;
+      font-size: 30px;
+      z-index: 1000;
+      pointer-events: none;
+      text-shadow: 2px 2px 0 #fff;
+      animation: floatUp 1.5s forwards;
+    }
+
+    @keyframes floatUp {
+      0% {
+        transform: translateY(0) scale(1);
+        opacity: 1;
+      }
+
+      100% {
+        transform: translateY(-100px) scale(1.5);
+        opacity: 0;
+      }
+    }
   </style>
 </head>
 
@@ -619,10 +644,17 @@
         osc.frequency.linearRampToValueAtTime(100, audioCtx.currentTime + 2.5);
 
         gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
-        gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 2.5);
-
         osc.start();
         osc.stop(audioCtx.currentTime + 2.5);
+      } else if (type === 'powerup') {
+        // Sonido de vida extra (tipo moneda/powerup)
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(600, audioCtx.currentTime);
+        osc.frequency.linearRampToValueAtTime(1200, audioCtx.currentTime + 0.1);
+        gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.3);
       }
     }
 
@@ -694,10 +726,61 @@
       playMusicLoop();
     }
 
-    // Función Maestra de Interacción
     function handleInteraction() {
       startMusic();
       tryFullScreen();
+    }
+
+    // --- SISTEMA DE PUNTUACIÓN Y VIDAS EXTRA ---
+    function addScore(amount) {
+      const oldScore = score;
+      score += amount;
+
+      // Mostrar puntos flotantes (Amarillo)
+      showFloatingText('+' + amount, '#FFD700');
+
+      // Vida extra cada 500 puntos (comprobamos si cambiamos de 'centena' de 500)
+      if (Math.floor(score / 500) > Math.floor(oldScore / 500)) {
+        vidas++;
+        updateLivesUI();
+        playSound('powerup');
+
+        // Efecto visual simple (flash verde en UI vidas)
+        const uiVidas = document.getElementById('ui-vidas');
+        if (uiVidas) {
+          uiVidas.style.transform = "scale(1.5)";
+          uiVidas.style.transition = "transform 0.2s";
+          setTimeout(() => uiVidas.style.transform = "scale(1)", 200);
+        }
+
+        // Efecto flotante sobre el personaje para la vida (Rojo)
+        // Pequeño delay para que no se superponga perfectamente con los puntos
+        setTimeout(() => showFloatingText("+1 ❤", "#ff4444"), 200);
+      }
+      updateScoreUI();
+    }
+
+    function showFloatingText(text, color = '#fff') {
+      const floatEl = document.createElement('div');
+      floatEl.classList.add('floating-text');
+      floatEl.innerText = text;
+      floatEl.style.color = color;
+
+      // Posicionar sobre el personaje
+      // Como el personaje se mueve con transform, usamos su posicion logica xWorld/y
+      // Pero el texto debe estar en el mundo ('mundo' container) para moverse con el scroll
+      // Randomizar un poco la X para que no se apilen feo
+      const randomOffset = Math.floor(Math.random() * 40) - 20;
+
+      floatEl.style.left = (xWorld + 20 + randomOffset) + 'px';
+      floatEl.style.bottom = (y + 100) + 'px'; // Encima de la cabeza
+
+      mundo.appendChild(floatEl);
+
+      // Auto-eliminar despues de la animacion
+      setTimeout(() => {
+        floatEl.remove();
+      }, 1500);
     }
 
 
@@ -791,7 +874,8 @@
         playSound('level');
         xWorld = 200; // Reset posición
         // Avanzamos nivel (la logica de World está dentro)
-        score += 100; // Puntos por nivel
+        // Avanzamos nivel (la logica de World está dentro)
+        addScore(100); // Puntos por nivel
         iniciarNivel(nivel + 1);
         console.log(`Nivel Completado! World ${world} - Nivel ${nivel}`);
 
@@ -829,8 +913,7 @@
         // DETECTAR SI LOGRAMOS PASAR EL OBSTÁCULO (Sumar puntos)
         if (!obs.passed && xWorld > obs.x + obs.w) {
           obs.passed = true;
-          score += 10;
-          updateScoreUI();
+          // addScore(10); // ELIMINADO: Solo puntos por muerte de enemigo o nivel completado
         }
 
         // Obstaculo hitbox (le damos un pequeño margen interno de 5px también)
@@ -994,6 +1077,8 @@
           if (isAttacking) {
             enemy.isDead = true;
             enemy.velocityY = -15; // Salto inicial al morir
+            addScore(50); // Puntos por matar enemigo
+            enemy.element.style.opacity = '0.5';
             playSound('bump');
           } else if (!isInvincible) {
             xWorld -= 100;
