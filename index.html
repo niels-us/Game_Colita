@@ -529,7 +529,9 @@
           w: 80,
           h: 80,
           dir: (Math.random() > 0.5) ? 1 : -1, // Dirección inicial aleatoria
-          speed: 2 // velocidad de patrulla
+          speed: 2, // velocidad de patrulla
+          isDead: false,
+          velocityY: 0
         });
       }
     }
@@ -958,6 +960,20 @@
       for (let i = enemigos.length - 1; i >= 0; i--) {
         let enemy = enemigos[i];
 
+        if (enemy.isDead) {
+          // Animación de muerte (salto y caída)
+          enemy.velocityY += gravedad;
+          enemy.y -= enemy.velocityY;
+          enemy.element.style.bottom = enemy.y + 'px';
+
+          // Eliminar si cae muy abajo
+          if (enemy.y < -200) {
+            enemy.element.remove();
+            enemigos.splice(i, 1);
+          }
+          continue;
+        }
+
         // Mover enemigo
         enemy.x += enemy.speed * enemy.dir;
 
@@ -976,8 +992,8 @@
           y + 100 > enemy.y + 10) {
 
           if (isAttacking) {
-            enemy.element.remove();
-            enemigos.splice(i, 1);
+            enemy.isDead = true;
+            enemy.velocityY = -15; // Salto inicial al morir
             playSound('bump');
           } else if (!isInvincible) {
             xWorld -= 100;
