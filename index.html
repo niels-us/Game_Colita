@@ -366,6 +366,7 @@
       <div class="boton" id="btnRight">▶</div>
     </div>
     <div id="salto">
+      <div class="boton" id="btnAttack" style="margin-right: 15px; background: rgba(255, 0, 0, 0.6);">Z</div>
       <div class="boton" id="btnUp">▲</div>
     </div>
   </div>
@@ -378,7 +379,9 @@
     // ELEMENTOS DE CONTROL MÓVIL
     const btnLeft = document.getElementById('btnLeft');
     const btnRight = document.getElementById('btnRight');
+
     const btnUp = document.getElementById('btnUp');
+    const btnAttack = document.getElementById('btnAttack');
 
     // --- VARIABLES GLOBALES DEL JUEGO ---
     // PERSONAJE
@@ -415,7 +418,10 @@
     const imgParado = "img/cola.png";
     const imgCam1 = "img/cola1.png";
     const imgCam2 = "img/cola2.png";
+
     const imgSaltar = "img/cola3.png";
+    const imgAtaque = "img/cola4.png"; // Nueva imagen de ataque
+    let isAttacking = false; // Estado de ataque
 
     // GENERACIÓN DE NIVELES Y OBSTÁCULOS
     // (Variables definidas arriba)
@@ -501,32 +507,31 @@
           passed: false
         });
       }
-    }
 
-    // Primero limpiamos los anteriores
-    enemigos.forEach(e => e.element.remove());
-    enemigos = [];
+      // 5. Generar nuevos enemigos
+      enemigos.forEach(e => e.element.remove());
+      enemigos = [];
 
-    for (let i = 0; i < 4; i++) {
-      // Spawnear en una posición aleatoria lejana pero transitable
-      // AUMENTADO: min 1000 para que no aparezcan al inicio
-      const enemyX = randomInt(1000, 2800);
-      const enemyEl = document.createElement('div');
-      enemyEl.classList.add('enemigo');
-      enemyEl.innerHTML = `<img src="${imgEnemigo}" alt="Cola-Pick">`;
-      enemyEl.style.left = enemyX + 'px';
-      enemyEl.style.bottom = '120px'; // Sobre el suelo
-      mundo.appendChild(enemyEl);
+      for (let i = 0; i < 4; i++) {
+        // Spawnear en una posición aleatoria lejana pero transitable
+        const enemyX = randomInt(1000, 2800);
+        const enemyEl = document.createElement('div');
+        enemyEl.classList.add('enemigo');
+        enemyEl.innerHTML = `<img src="${imgEnemigo}" alt="Cola-Pick">`;
+        enemyEl.style.left = enemyX + 'px';
+        enemyEl.style.bottom = '120px'; // Sobre el suelo
+        mundo.appendChild(enemyEl);
 
-      enemigos.push({
-        element: enemyEl,
-        x: enemyX,
-        y: 120,
-        w: 80,
-        h: 80,
-        dir: (Math.random() > 0.5) ? 1 : -1, // Dirección inicial aleatoria
-        speed: 2 // velocidad de patrulla
-      });
+        enemigos.push({
+          element: enemyEl,
+          x: enemyX,
+          y: 120,
+          w: 80,
+          h: 80,
+          dir: (Math.random() > 0.5) ? 1 : -1, // Dirección inicial aleatoria
+          speed: 2 // velocidad de patrulla
+        });
+      }
     }
 
 
@@ -730,6 +735,26 @@
     btnUp.addEventListener('touchend', (e) => { e.preventDefault(); setKey('ArrowUp', false); });
     btnUp.addEventListener('mousedown', () => setKey('ArrowUp', true));
     btnUp.addEventListener('mouseup', () => setKey('ArrowUp', false));
+
+    // Eventos para el botón Ataque
+    function performAttack() {
+      if (isAttacking || isDead) return;
+      isAttacking = true;
+      // Reset después de 300ms (duración del golpe)
+      setTimeout(() => {
+        isAttacking = false;
+      }, 300);
+    }
+
+    // Listener Tecla Z
+    window.addEventListener('keydown', (e) => {
+      if (e.key.toLowerCase() === 'z') {
+        performAttack();
+      }
+    });
+
+    btnAttack.addEventListener('touchstart', (e) => { e.preventDefault(); performAttack(); });
+    btnAttack.addEventListener('mousedown', (e) => { e.preventDefault(); performAttack(); });
     // ---------------------------------
 
     window.addEventListener('resize', () => {
@@ -856,7 +881,10 @@
       }
 
       // animación sprite
-      if (!enSuelo) {
+      // animación sprite
+      if (isAttacking) {
+        sprite.src = imgAtaque;
+      } else if (!enSuelo) {
         sprite.src = imgSaltar;
       } else if (teclas.ArrowLeft || teclas.ArrowRight) {
         animTick++;
@@ -926,35 +954,34 @@
       personajeEl.style.transform = `translate3d(${Math.round(screenX)}px, ${-Math.round(y)}px, 0) scaleX(${facing})`;
 
       // --- LÓGICA ENEMIGOS (Patrulla simple) ---
-      for (let enemy of enemigos) {
+      // --- Lógica ENEMIGOS (Patrulla simple) ---
+      for (let i = enemigos.length - 1; i >= 0; i--) {
+        let enemy = enemigos[i];
+
         // Mover enemigo
         enemy.x += enemy.speed * enemy.dir;
 
-        // Cambio de dirección simple (si choca con límites invisibles de patrulla o random)
-        // Haremos que patrulle 200px a la redonda de su spawn original?
-        // Mejor simple: rebote si se acerca a obstaculos o aleatorio.
-        // Rebote simple cada 100 frames o si toca borde mundo
+        // Cambio de dirección simple
         if (Math.random() < 0.01) enemy.dir *= -1;
         if (enemy.x < 0) enemy.dir = 1;
         if (enemy.x > anchoMundo - 80) enemy.dir = -1;
 
         enemy.element.style.left = enemy.x + 'px';
-        enemy.element.style.transform = `scaleX(${-enemy.dir})`; // Voltear sprite
+        enemy.element.style.transform = `scaleX(${-enemy.dir})`;
 
-        // COLISIÓN CON ENEMIGO
-        // Hitbox simple
+        // COLISIÓN
         if (xWorld < enemy.x + enemy.w - 20 &&
           xWorld + anchoPersonaje > enemy.x + 20 &&
           y < enemy.y + enemy.h - 10 &&
           y + 100 > enemy.y + 10) {
 
-          if (!isInvincible) {
-            // DAÑO SOLO SI NO ES INVENCIBLE
-            console.log("¡Daño por enemigo!");
-            // Empujón fuerte
+          if (isAttacking) {
+            enemy.element.remove();
+            enemigos.splice(i, 1);
+            playSound('bump');
+          } else if (!isInvincible) {
             xWorld -= 100;
             playSound('bump');
-
             takeDamage();
           }
         }
