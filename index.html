@@ -95,6 +95,15 @@
       top: 5px;
     }
 
+    /* Sol */
+    .sun {
+      position: fixed;
+      width: 120px;
+      height: 120px;
+      z-index: 0;
+      /* Detras del mundo */
+    }
+
     /* Suelo */
     .suelo {
       position: absolute;
@@ -364,6 +373,8 @@
     <div id="ui-vidas" class="ui-text">❤❤❤❤❤</div>
   </div>
 
+  <img src="img/sun.png" class="sun" style="top: 40px; left: 250px;" alt="Sol">
+
   <div class="mundo" id="mundo">
     <div class="nube pequeña" style="top: 80px; left: 100px;"></div>
     <div class="nube pequeña" style="top: 150px; left: 400px;"></div>
@@ -447,6 +458,11 @@
     const imgSaltar = "img/cola3.png";
     const imgAtaque = "img/cola4.png"; // Nueva imagen de ataque
     let isAttacking = false; // Estado de ataque
+
+    // NUEVOS PERSONAJES (BEE-COLA)
+    const imgBee1 = "img/bee-cola1.png";
+    const imgBee2 = "img/bee-cola2.png";
+    const imgBee3 = "img/bee-cola3.png";
 
     // GENERACIÓN DE NIVELES Y OBSTÁCULOS
     // (Variables definidas arriba)
@@ -537,26 +553,45 @@
       enemigos.forEach(e => e.element.remove());
       enemigos = [];
 
-      for (let i = 0; i < 4; i++) {
+      for (let i = 0; i < 6; i++) {
         // Spawnear en una posición aleatoria lejana pero transitable
         const enemyX = randomInt(1000, 2800);
+
+        // Decidir tipo de enemigo (50% probabilidad)
+        const isBee = Math.random() > 0.5;
+
         const enemyEl = document.createElement('div');
         enemyEl.classList.add('enemigo');
-        enemyEl.innerHTML = `<img src="${imgEnemigo}" alt="Cola-Pick">`;
+
+        // Configuración específica según tipo
+        let tipo = 'walker';
+        let posY = 120;
+        let imgSrc = imgEnemigo;
+
+        if (isBee) {
+          tipo = 'bee';
+          // Altura varia: 120 (suelo/cola) o 280 (aire)
+          posY = (Math.random() > 0.5) ? 120 : 280;
+          imgSrc = imgBee1;
+        }
+
+        enemyEl.innerHTML = `<img src="${imgSrc}" alt="Enemigo">`;
         enemyEl.style.left = enemyX + 'px';
-        enemyEl.style.bottom = '120px'; // Sobre el suelo
+        enemyEl.style.bottom = posY + 'px';
         mundo.appendChild(enemyEl);
 
         enemigos.push({
+          type: tipo,
           element: enemyEl,
           x: enemyX,
-          y: 120,
+          y: posY, // Posición lógica Y
           w: 80,
           h: 80,
           dir: (Math.random() > 0.5) ? 1 : -1, // Dirección inicial aleatoria
-          speed: 2, // velocidad de patrulla
+          speed: isBee ? 3 : 2, // Abejas un poco más rápidas
           isDead: false,
-          velocityY: 0
+          velocityY: 0,
+          animTimer: 0 // Para animación de abejas
         });
       }
     }
@@ -1049,6 +1084,14 @@
           enemy.y -= enemy.velocityY;
           enemy.element.style.bottom = enemy.y + 'px';
 
+          // IMAGEN DE MUERTE PARA ABEJAS
+          if (enemy.type === 'bee') {
+            const img = enemy.element.querySelector('img');
+            if (img && !img.src.includes('bee-cola3.png')) {
+              img.src = imgBee3;
+            }
+          }
+
           // Eliminar si cae muy abajo
           if (enemy.y < -200) {
             enemy.element.remove();
@@ -1064,6 +1107,18 @@
         if (Math.random() < 0.01) enemy.dir *= -1;
         if (enemy.x < 0) enemy.dir = 1;
         if (enemy.x > anchoMundo - 80) enemy.dir = -1;
+
+        // ANIMACIÓN ABEJAS (Alternar imagenes)
+        if (enemy.type === 'bee') {
+          enemy.animTimer++;
+          const img = enemy.element.querySelector('img');
+          // Cambiar imagen cada 10 frames (aprox 6 veces por seg a 60fps)
+          if (enemy.animTimer % 20 < 10) {
+            if (img && !img.src.includes('bee-cola1.png')) img.src = imgBee1;
+          } else {
+            if (img && !img.src.includes('bee-cola2.png')) img.src = imgBee2;
+          }
+        }
 
         enemy.element.style.left = enemy.x + 'px';
         enemy.element.style.transform = `scaleX(${-enemy.dir})`;
