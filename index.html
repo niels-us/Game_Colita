@@ -262,6 +262,18 @@
       object-fit: contain;
     }
 
+    /* Estilo para enemigos con tramas (Spritesheet) */
+    .enemigo.sprite-sheet {
+      overflow: hidden;
+      background-size: 200% 100%;
+      background-repeat: no-repeat;
+    }
+
+    .enemigo.sprite-sheet img {
+      display: none;
+      /* Ocultamos la img tag si usamos tramas de fondo */
+    }
+
     /* Clase de parpadeo para invulnerabilidad */
     .parpadeo {
       animation: blink 0.2s infinite;
@@ -357,6 +369,73 @@
         opacity: 0;
       }
     }
+
+    /* Efecto de Agua para Mundo 2 */
+    #capa-agua {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: 50vh;
+      background: rgba(0, 120, 255, 0.4);
+      backdrop-filter: blur(2px);
+      z-index: 150;
+      display: none;
+      pointer-events: none;
+      border-top: 5px solid rgba(255, 255, 255, 0.5);
+    }
+
+    #capa-agua::after {
+      content: "";
+      position: absolute;
+      top: -10px;
+      left: 0;
+      width: 200%;
+      height: 20px;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+      animation: wave 3s infinite linear;
+    }
+
+    @keyframes wave {
+      from {
+        transform: translateX(0);
+      }
+
+      to {
+        transform: translateX(-50%);
+      }
+    }
+
+    .nadando {
+      filter: hue-rotate(180deg) brightness(1.2);
+    }
+
+    /* BURBUJAS */
+    .burbuja {
+      position: absolute;
+      background: rgba(255, 255, 255, 0.3);
+      border: 1px solid rgba(255, 255, 255, 0.5);
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 140;
+      animation: floatBubble linear forwards;
+    }
+
+    @keyframes floatBubble {
+      0% {
+        transform: translateY(0) scale(0.2);
+        opacity: 0;
+      }
+
+      20% {
+        opacity: 0.6;
+      }
+
+      100% {
+        transform: translateY(-200px) scale(1.5);
+        opacity: 0;
+      }
+    }
   </style>
 </head>
 
@@ -384,6 +463,8 @@
 
     <div class="suelo"></div>
   </div>
+
+  <div id="capa-agua"></div>
 
   <div class="personaje" id="personaje">
     <img id="sprite" src="img/cola1.png" alt="Personaje">
@@ -437,9 +518,11 @@
     // CONFIG JUEGO
     const gravedad = 1;
     const fuerzaSalto = 18;
-    const velocidadX = 6;
+    const velocidadX_Normal = 6;
+    let velocidadX = 6;
     const alturaSuelo = 100;
     const anchoPersonaje = 100;
+    let isUnderWater = false;
 
     // ANIMACIÓN
     let animTick = 0;
@@ -457,12 +540,28 @@
 
     const imgSaltar = "img/cola3.png";
     const imgAtaque = "img/cola4.png"; // Nueva imagen de ataque
+    const imgNadar = "img/cola5.png";  // Nueva imagen de nado
     let isAttacking = false; // Estado de ataque
 
-    // NUEVOS PERSONAJES (BEE-COLA)
     const imgBee1 = "img/bee-cola1.png";
     const imgBee2 = "img/bee-cola2.png";
     const imgBee3 = "img/bee-cola3.png";
+
+    // NUEVOS PERSONAJES (COLA-BIG)
+    const imgBigTall = [
+      "img/cola-big-tall-1.png",
+      "img/cola-big-tall-2.png",
+      "img/cola-big-tall-3.png"
+    ];
+    const imgBigShort = [
+      "img/cola-big-short-1.png",
+      "img/cola-big-short-2.png",
+      "img/cola-big-short-3.png"
+    ];
+    const imgBigDead = "img/cola-big-short-4.png";
+
+    const imgFishSheet = "img/cola-fish.png";
+    const imgKingSheet = "img/cola-king.png";
 
     // GENERACIÓN DE NIVELES Y OBSTÁCULOS
     // (Variables definidas arriba)
@@ -509,9 +608,29 @@
       if (uiWorld) uiWorld.innerText = 'WORLD: ' + world;
       updateScoreUI();
 
-      // 2. Si cambiamos de mundo, cambiamos fondo
+      // 2. Si cambiamos de mundo, cambiamos fondo y agua
       if (nuevoWorld) {
         updateBackground();
+        const capaAgua = document.getElementById('capa-agua');
+        const suelo = document.querySelector('.suelo');
+
+        if (world % 2 === 0) {
+          capaAgua.style.display = 'block';
+          isUnderWater = true;
+          velocidadX = 3; // Más lento bajo el agua
+          if (suelo) {
+            suelo.style.background = "#ffdbac"; // Color Piel
+            suelo.style.borderTopColor = "#e8c39e";
+          }
+        } else {
+          capaAgua.style.display = 'none';
+          isUnderWater = false;
+          velocidadX = velocidadX_Normal;
+          if (suelo) {
+            suelo.style.background = "linear-gradient(to top, #228B22, #32CD32)";
+            suelo.style.borderTopColor = "#1a6b1a";
+          }
+        }
       }
 
       // 3. Limpiar obstáculos viejos
@@ -555,45 +674,150 @@
 
       for (let i = 0; i < 6; i++) {
         // Spawnear en una posición aleatoria lejana pero transitable
-        const enemyX = randomInt(1000, 2800);
+        // En niveles altos (>=5), el primero será 'big' para mostrar la mecánica
+        let enemyX = (i === 0) ? 700 : randomInt(1000, 2800);
 
-        // Decidir tipo de enemigo (50% probabilidad)
-        const isBee = Math.random() > 0.5;
+        // Decidir tipo de enemigo basado en el nivel y el mundo
+        let tiposDisponibles = [];
+        if (world % 2 === 0) {
+          // Solo peces en mundos pares
+          tiposDisponibles = ['fish'];
+        } else {
+          tiposDisponibles = ['walker'];
+          if (nivel >= 3) tiposDisponibles.push('bee');
+          if (nivel >= 5) tiposDisponibles.push('big');
+        }
+
+        // LÓGICA ESPECIAL NIVEL 10: Solo un Cola-King al inicio en la mitad
+        if (nivel === 10 && !isUnderWater) {
+          if (i === 0) {
+            tipo = 'king';
+          } else {
+            // No spawneamos más enemigos al inicio en el nivel 10
+            continue;
+          }
+        } else {
+          // Lógica anterior para otros niveles
+          if (i === 0) {
+            // Forzar el tipo más avanzado disponible para el primer enemigo
+            if (world % 2 === 0) tipo = 'fish';
+            else if (nivel >= 5) tipo = 'big';
+            else if (nivel >= 3) tipo = 'bee';
+            else tipo = 'walker';
+          } else {
+            tipo = tiposDisponibles[randomInt(0, tiposDisponibles.length - 1)];
+          }
+        }
+
+        let posY = 120;
+        let imgSrc = imgEnemigo;
+        let w = 80;
+        let h = 80;
+
+        if (tipo === 'bee') {
+          posY = (Math.random() > 0.5) ? 120 : 280;
+          imgSrc = imgBee1;
+        } else if (tipo === 'big') {
+          posY = 120;
+          imgSrc = imgBigTall[0];
+          w = 100;
+          h = 130;
+        } else if (tipo === 'fish') {
+          // El pez nace en diferentes alturas del agua (bajo la superficie de 50vh)
+          const waterTop = window.innerHeight * 0.5;
+          const waterBottom = 120;
+          const depth = randomInt(0, 2); // 0: arriba, 1: medio, 2: abajo
+
+          if (depth === 0) posY = waterTop - 70; // Arriba
+          else if (depth === 1) posY = (waterTop + waterBottom) / 2 - 30; // Medio
+          else posY = waterBottom + 10; // Abajo (cerca del suelo)
+
+          imgSrc = imgFishSheet;
+          w = 80;
+          h = 60;
+        } else if (tipo === 'king') {
+          posY = 120;
+          imgSrc = imgKingSheet;
+          w = 120;
+          h = 120;
+          // Si es nivel 10, aparece en la mitad del mapa
+          if (nivel === 10) enemyX = 1500;
+        }
 
         const enemyEl = document.createElement('div');
         enemyEl.classList.add('enemigo');
+        enemyEl.style.width = w + 'px';
+        enemyEl.style.height = h + 'px';
 
-        // Configuración específica según tipo
-        let tipo = 'walker';
-        let posY = 120;
-        let imgSrc = imgEnemigo;
-
-        if (isBee) {
-          tipo = 'bee';
-          // Altura varia: 120 (suelo/cola) o 280 (aire)
-          posY = (Math.random() > 0.5) ? 120 : 280;
-          imgSrc = imgBee1;
+        if (tipo === 'fish' || tipo === 'king') {
+          enemyEl.classList.add('sprite-sheet');
+          enemyEl.style.backgroundImage = `url(${imgSrc})`;
+          enemyEl.style.backgroundPosition = '0% 0%';
+          if (tipo === 'king') {
+            enemyEl.style.backgroundSize = '500% 100%'; // 5 posiciones
+          }
+        } else {
+          enemyEl.innerHTML = `<img src="${imgSrc}" alt="Enemigo">`;
         }
 
-        enemyEl.innerHTML = `<img src="${imgSrc}" alt="Enemigo">`;
         enemyEl.style.left = enemyX + 'px';
         enemyEl.style.bottom = posY + 'px';
         mundo.appendChild(enemyEl);
 
         enemigos.push({
           type: tipo,
+          state: tipo === 'big' ? 'tall' : 'normal',
           element: enemyEl,
           x: enemyX,
-          y: posY, // Posición lógica Y
-          w: 80,
-          h: 80,
-          dir: (Math.random() > 0.5) ? 1 : -1, // Dirección inicial aleatoria
-          speed: isBee ? 3 : 2, // Abejas un poco más rápidas
+          y: posY,
+          w: w,
+          h: h,
+          dir: (Math.random() > 0.5) ? 1 : -1,
+          speed: tipo === 'bee' ? 3 : 2,
           isDead: false,
           velocityY: 0,
-          animTimer: 0 // Para animación de abejas
+          animTimer: 0,
+          lives: tipo === 'king' ? 20 : 1,
+          hitTimer: 0,
+          spawnTimer: 0 // Para el spawn de secuaces del King
         });
       }
+    }
+
+    // Función helper para spawnear secuaces detrás del King
+    function spawnMinion(x, y) {
+      const enemyX = x - 50; // Detrás
+      const posY = y;
+      const imgSrc = imgEnemigo;
+      const w = 80;
+      const h = 80;
+
+      const enemyEl = document.createElement('div');
+      enemyEl.classList.add('enemigo');
+      enemyEl.style.width = w + 'px';
+      enemyEl.style.height = h + 'px';
+      enemyEl.innerHTML = `<img src="${imgSrc}" alt="Enemigo">`;
+      enemyEl.style.left = enemyX + 'px';
+      enemyEl.style.bottom = posY + 'px';
+      mundo.appendChild(enemyEl);
+
+      enemigos.push({
+        type: 'walker',
+        state: 'normal',
+        element: enemyEl,
+        x: enemyX,
+        y: posY,
+        w: w,
+        h: h,
+        dir: -1,
+        speed: 2,
+        isDead: false,
+        velocityY: 0,
+        animTimer: 0,
+        lives: 1,
+        hitTimer: 0,
+        spawnTimer: 0
+      });
     }
 
 
@@ -906,31 +1130,93 @@
 
       // Si llega al final derecho -> "Siguiente Nivel" (ciclo)
       if (xWorld > anchoMundo - anchoPersonaje) {
-        playSound('level');
-        xWorld = 200; // Reset posición
-        // Avanzamos nivel (la logica de World está dentro)
-        // Avanzamos nivel (la logica de World está dentro)
-        addScore(100); // Puntos por nivel
-        iniciarNivel(nivel + 1);
-        console.log(`Nivel Completado! World ${world} - Nivel ${nivel}`);
-
-        mundo.style.transition = 'none';
+        // Bloqueo nivel 10: No se puede pasar si el King vive
+        const kingAlive = enemigos.some(e => e.type === 'king' && !e.isDead);
+        if (nivel === 10 && kingAlive) {
+          xWorld = anchoMundo - anchoPersonaje; // No dejar avanzar más
+        } else {
+          playSound('level');
+          xWorld = 200; // Reset posición
+          // Avanzamos nivel (la logica de World está dentro)
+          addScore(100); // Puntos por nivel
+          iniciarNivel(nivel + 1);
+          console.log(`Nivel Completado! World ${world} - Nivel ${nivel}`);
+          mundo.style.transition = 'none';
+        }
       }
 
-      // salto
-      if (teclas.ArrowUp && enSuelo) {
-        playSound('jump');
-        velocidadY = -fuerzaSalto;
-        enSuelo = false;
+      // gravedad y nado
+      let gravedadActual = isUnderWater ? 0.2 : gravedad;
+      let fuerzaSaltoActual = isUnderWater ? 8 : fuerzaSalto;
+
+      if (isUnderWater) {
+        if (teclas.ArrowUp) {
+          // Nado libre hacia arriba
+          velocidadY -= 0.6;
+          if (velocidadY < -5) velocidadY = -5; // Tope de velocidad de nado
+          enSuelo = false;
+        } else {
+          // Descenso suave en agua
+          velocidadY += gravedadActual;
+          if (velocidadY > 3) velocidadY = 3; // Caída lenta en agua
+        }
+
+        // Límite de superficie de agua (50vh)
+        const limiteSuperficie = window.innerHeight / 2 - 60;
+        if (y > limiteSuperficie) {
+          y = limiteSuperficie;
+          if (velocidadY < 0) velocidadY = 0;
+        }
+      } else {
+        // Salto normal fuera del agua
+        if (teclas.ArrowUp && enSuelo) {
+          playSound('jump');
+          velocidadY = -fuerzaSalto;
+          enSuelo = false;
+        }
+        velocidadY += gravedadActual;
       }
 
-      // gravedad
-      velocidadY += gravedad;
       y -= velocidadY;
       if (y <= alturaSuelo) {
         y = alturaSuelo;
         velocidadY = 0;
         enSuelo = true;
+      }
+
+      // Efecto visual de nado y burbujas
+      if (isUnderWater) {
+        personajeEl.classList.add('nadando');
+        // Pequeño balanceo por el agua
+        y += Math.sin(Date.now() / 500) * 0.5;
+
+        // Generar burbujas aleatorias
+        if (Math.random() < 0.05) {
+          crearBurbuja();
+        }
+      } else {
+        personajeEl.classList.remove('nadando');
+      }
+
+      function crearBurbuja() {
+        const b = document.createElement('div');
+        b.classList.add('burbuja');
+        const size = Math.random() * 10 + 5;
+        b.style.width = size + 'px';
+        b.style.height = size + 'px';
+
+        // Posición relativa al mundo para que se muevan con el scroll
+        const bX = xWorld + (Math.random() * 80 - 20);
+        const bY = y + (Math.random() * 20);
+
+        b.style.left = bX + 'px';
+        b.style.bottom = bY + 'px';
+
+        const duration = Math.random() * 1.5 + 1;
+        b.style.animationDuration = duration + 's';
+
+        mundo.appendChild(b);
+        setTimeout(() => b.remove(), duration * 1000);
       }
 
       // --- DETECCIÓN DE COLISIONES ---
@@ -1004,6 +1290,8 @@
       // animación sprite
       if (isAttacking) {
         sprite.src = imgAtaque;
+      } else if (isUnderWater && !enSuelo) {
+        sprite.src = imgNadar; // Solo usa forma nado si NO está en el suelo
       } else if (!enSuelo) {
         sprite.src = imgSaltar;
       } else if (teclas.ArrowLeft || teclas.ArrowRight) {
@@ -1090,6 +1378,13 @@
             if (img && !img.src.includes('bee-cola3.png')) {
               img.src = imgBee3;
             }
+          } else if (enemy.type === 'big') {
+            const img = enemy.element.querySelector('img');
+            if (img && !img.src.includes('cola-big-short-4.png')) {
+              img.src = imgBigDead;
+            }
+          } else if (enemy.type === 'king') {
+            enemy.element.style.backgroundPosition = '100% 0%'; // Posición 5
           }
 
           // Eliminar si cae muy abajo
@@ -1104,24 +1399,61 @@
         enemy.x += enemy.speed * enemy.dir;
 
         // Cambio de dirección simple
-        if (Math.random() < 0.01) enemy.dir *= -1;
+        if (enemy.type !== 'fish') {
+          if (Math.random() < 0.01) enemy.dir *= -1;
+        }
         if (enemy.x < 0) enemy.dir = 1;
         if (enemy.x > anchoMundo - 80) enemy.dir = -1;
 
-        // ANIMACIÓN ABEJAS (Alternar imagenes)
+        // ANIMACIÓN ABEJAS Y BIG (Alternar imagenes)
+        enemy.animTimer++;
+        const img = enemy.element.querySelector('img');
+
         if (enemy.type === 'bee') {
-          enemy.animTimer++;
-          const img = enemy.element.querySelector('img');
           // Cambiar imagen cada 10 frames (aprox 6 veces por seg a 60fps)
           if (enemy.animTimer % 20 < 10) {
             if (img && !img.src.includes('bee-cola1.png')) img.src = imgBee1;
           } else {
             if (img && !img.src.includes('bee-cola2.png')) img.src = imgBee2;
           }
+        } else if (enemy.type === 'big') {
+          if (enemy.state === 'tall') {
+            const frame = Math.floor((enemy.animTimer % 30) / 10); // 0, 1, 2
+            img.src = imgBigTall[frame];
+          } else {
+            const frame = Math.floor((enemy.animTimer % 30) / 10); // 0, 1, 2
+            img.src = imgBigShort[frame];
+          }
+        } else if (enemy.type === 'fish') {
+          // Animación por tramas (2 frames en una sola imagen)
+          if (enemy.animTimer % 20 < 10) {
+            enemy.element.style.backgroundPosition = '0% 0%';
+          } else {
+            enemy.element.style.backgroundPosition = '100% 0%';
+          }
+        } else if (enemy.type === 'king') {
+          if (enemy.hitTimer > 0) {
+            enemy.hitTimer--;
+            enemy.element.style.backgroundPosition = '75% 0%'; // Posición 4
+          } else {
+            // Posiciones 1, 2, 3 alternando
+            const walkingFrame = Math.floor((enemy.animTimer % 30) / 10); // 0, 1, 2
+            enemy.element.style.backgroundPosition = `${walkingFrame * 25}% 0%`;
+          }
         }
 
         enemy.element.style.left = enemy.x + 'px';
+        enemy.element.style.bottom = enemy.y + 'px';
         enemy.element.style.transform = `scaleX(${-enemy.dir})`;
+
+        // LÓGICA DE SPAWN PARA EL KING (Cada 20 segundos = 1200 frames a 60fps)
+        if (enemy.type === 'king' && !enemy.isDead && nivel === 10) {
+          enemy.spawnTimer++;
+          if (enemy.spawnTimer >= 1200) {
+            enemy.spawnTimer = 0;
+            spawnMinion(enemy.x, enemy.y);
+          }
+        }
 
         // COLISIÓN
         if (xWorld < enemy.x + enemy.w - 20 &&
@@ -1130,11 +1462,48 @@
           y + 100 > enemy.y + 10) {
 
           if (isAttacking) {
-            enemy.isDead = true;
-            enemy.velocityY = -15; // Salto inicial al morir
-            addScore(50); // Puntos por matar enemigo
-            enemy.element.style.opacity = '0.5';
-            playSound('bump');
+            // Evitar que un solo ataque cuente como múltiples golpes (cooldown de 500ms)
+            const ahora = Date.now();
+            if (enemy.lastHit && ahora - enemy.lastHit < 500) continue;
+
+            enemy.lastHit = ahora;
+
+            if (enemy.type === 'big' && enemy.state === 'tall') {
+              // Transformar a short
+              enemy.state = 'short';
+              enemy.h = 80; // Reducir altura física
+              enemy.element.style.height = '80px';
+              playSound('bump');
+              addScore(25); // Puntos por el primer golpe
+
+              // Efecto visual de golpe
+              enemy.element.style.filter = "brightness(2)";
+              setTimeout(() => enemy.element.style.filter = "none", 100);
+            } else if (enemy.type === 'king') {
+              enemy.lives--;
+              enemy.hitTimer = 60; // Mostrar posición 4 por aprox 1 segundo (60 frames)
+              playSound('bump');
+              addScore(10);
+
+              if (enemy.lives <= 0) {
+                enemy.isDead = true;
+                enemy.velocityY = -15;
+                addScore(500); // Gran bonus por el rey
+                enemy.element.style.opacity = '0.8';
+              } else {
+                // Pequeño retroceso al golpearlo
+                enemy.x -= enemy.dir * 30;
+                // Efecto visual
+                enemy.element.style.filter = "invert(0.5)";
+                setTimeout(() => enemy.element.style.filter = "none", 100);
+              }
+            } else {
+              enemy.isDead = true;
+              enemy.velocityY = -15; // Salto inicial al morir
+              addScore(50); // Puntos por matar enemigo
+              enemy.element.style.opacity = '0.5';
+              playSound('bump');
+            }
           } else if (!isInvincible) {
             xWorld -= 100;
             playSound('bump');
